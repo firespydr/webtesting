@@ -1,6 +1,13 @@
 # Starting over
 
-## 1. Rechecking for the Caddyfile
+I  cannot access the website (hosted on linode instance running podman) locally or on another network despite many attempts to troubleshoot and rebuild. In overview, I have validated the A record for the domain name, ran CURL commands to check on the cert status, rebuilt the image like 15 times. I believe we have narrowed this down to issues getting a cert in both prod and staging lets encrypt from the logs of the podman instance. I'm unable to get the letsencrypt cert function of Caddy to work, nor can I access the website. The Caddyfile has been validated multiple times. 
+
+After multiple attempts to solve this issue, I am going to start over from scratch here. 
+
+# Troubleshooting
+
+## 1. Checked for Caddyfile descrepencies 
+I checked for Caddyfile descrepencies between the host and volume mapping in podman as a last ditch effort to solve this. 
 
 ### a. Container
 
@@ -56,7 +63,7 @@ podman rm -f -a
 podman system prune -a --volumes -f
 ```
 
-### 2. CLear logs
+### 2. CLear logs - this was not successful
 
 ```
 sudo journalctl --vacuum-time=1s -u podman-container-caddy.service
@@ -96,3 +103,4 @@ docker.io/caddy:latest
 ```
 
 ### 2. Validate podman and container are all good
+### 3. Check for the existance of other Caddy files
