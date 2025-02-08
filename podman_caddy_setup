@@ -19,6 +19,7 @@ CADDY_DATA_DIR="${PROJECT_DIR}/caddy/data"
 # --- 1. Update Host OS ---
 echo "Updating the host OS..."
 sudo apt update && sudo apt upgrade -y
+echo "Host OS Updated..."
 
 # --- 2. Setup UFW Firewall Rules ---
 echo "Configuring ufw firewall..."
@@ -26,8 +27,8 @@ sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow OpenSSH
 # Allow the host ports that will be used by Caddy (container maps: 8080->80, 8443->443)
-sudo ufw allow 8080/tcp
-sudo ufw allow 8443/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
 sudo ufw --force enable
 echo "Current ufw status:"
 sudo ufw status verbose
@@ -41,110 +42,3 @@ read -p "Press Enter to continue once SSH access is confirmed..."
 # --- 4. Install Podman ---
 echo "Installing Podman..."
 sudo apt install -y podman
-
-# --- 5. Create Project Directory ---
-echo "Creating project directory: ${PROJECT_DIR}"
-sudo mkdir -p "${PROJECT_DIR}"
-sudo chown "$USER":"$USER" "${PROJECT_DIR}"
-
-# --- 6. Create docker-compose.yml for Caddy ---
-# This compose file will be placed in the project directory.
-echo "Creating docker-compose.yml in ${PROJECT_DIR}"
-cat > "${COMPOSE_FILE}" << 'EOF'
-version: "3.7"
-
-services:
-  caddy:
-    image: docker.io/caddy:latest
-    container_name: caddy
-    restart: always
-    ports:
-      - "8080:80"
-      - "8443:443"
-    volumes:
-      - ./caddy/config/Caddyfile:/etc/caddy/Caddyfile:Z
-      - ./caddy/webroot:/var/www:Z
-      - ./caddy/data:/data:Z
-EOF
-echo "docker-compose.yml created at ${COMPOSE_FILE}"
-
-# --- 7. Create Caddy Configuration Directory Structure ---
-echo "Creating Caddy configuration directories..."
-mkdir -p "${CADDY_CONFIG_DIR}" "${CADDY_WEBROOT_DIR}" "${CADDY_DATA_DIR}"
-
-# --- 8. Create the Caddyfile ---
-echo "Creating Caddyfile..."
-cat > "${CADDY_CONFIG_DIR}/Caddyfile" << 'EOF'
-:443 {
-    tls internal
-    root * /var/www
-    file_server
-}
-EOF
-echo "Caddyfile created at ${CADDY_CONFIG_DIR}/Caddyfile"
-
-# --- 9. Create the Webroot and index.html ---
-echo "Creating webroot and landing page..."
-mkdir -p "${CADDY_WEBROOT_DIR}"
-cat > "${CADDY_WEBROOT_DIR}/index.html" << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CADDY Landing Page</title>
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(to right, #667eea, #764ba2);
-            font-family: sans-serif;
-        }
-        h1 {
-            font-size: 8em;
-            font-weight: bold;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-    </style>
-</head>
-<body>
-    <h1>CADDY</h1>
-</body>
-</html>
-EOF
-echo "index.html created at ${CADDY_WEBROOT_DIR}/index.html"
-
-# --- 10. Launch Caddy using Podman Compose ---
-# Check if podman-compose is installed (it is usually available via podman-compose or simply use docker-compose compatibility)
-if command -v podman-compose &>/dev/null; then
-    echo "Starting Caddy container using podman-compose..."
-    (cd "${PROJECT_DIR}" && podman-compose up -d)
-else
-    echo "podman-compose not found. Starting Caddy container using podman run..."
-    podman run -d \
-      --name caddy \
-      --restart=always \
-      -p 8080:80 \
-      -p 8443:443 \
-      -v "${CADDY_CONFIG_DIR}/Caddyfile":/etc/caddy/Caddyfile:Z \
-      -v "${CADDY_WEBROOT_DIR}":/var/www:Z \
-      -v "${CADDY_DATA_DIR}":/data:Z \
-      docker.io/caddy:latest
-fi
-
-# --- 11. Check Podman Status and Display ---
-echo "Checking running containers..."
-podman ps
-
-# --- 12. Validate Deployment ---
-echo -e "\nValidation steps:"
-echo "1. On the host, run:"
-echo "   curl -4vk https://localhost:8443"
-echo "2. On a remote client (or via your hosts file entry mapping techpro.com to ${PUBLIC_IP}), access:"
-echo "   https://techpro.com:8443"
-echo "Note: With 'tls internal', you may see certificate warnings until you add Caddy's internal CA to your trust store."
-echo "Setup complete. Please review the above output for any errors."
